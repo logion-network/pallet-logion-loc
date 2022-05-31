@@ -14,9 +14,10 @@ mod tests;
 mod benchmarking;
 
 use frame_support::codec::{Decode, Encode};
-use frame_support::traits::Vec;
+use frame_support::dispatch::Vec;
+use scale_info::TypeInfo;
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub enum LocType {
 	Transaction,
 	Identity,
@@ -29,32 +30,32 @@ impl Default for LocType {
 	}
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct MetadataItem<AccountId> {
 	name: Vec<u8>,
 	value: Vec<u8>,
 	submitter: AccountId,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct LocLink<LocId> {
 	id: LocId,
 	nature: Vec<u8>,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct File<Hash, AccountId> {
 	hash: Hash,
 	nature: Vec<u8>,
 	submitter: AccountId,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct LocVoidInfo<LocId> {
 	replacer: Option<LocId>,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub enum Requester<AccountId, LocId> {
 	None,
 	Account(AccountId),
@@ -72,7 +73,7 @@ impl<AccountId, LocId> Default for Requester<AccountId, LocId> {
 
 pub type CollectionSize = u32;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber> {
 	owner: AccountId,
 	requester: Requester<AccountId, LocId>,
@@ -89,7 +90,7 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber> {
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId, <T as frame_system::Config>::BlockNumber>;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct CollectionItem {
 	description: Vec<u8>
 }
@@ -146,6 +147,7 @@ pub mod pallet {
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
+	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
 	/// All LOCs indexed by ID.
@@ -175,7 +177,6 @@ pub mod pallet {
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	#[pallet::metadata(T::LocId = "LocId")]
 	pub enum Event<T: Config> {
 		/// Issued upon LOC creation. [locId]
 		LocCreated(T::LocId),
@@ -238,7 +239,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
-	#[derive(Encode, Decode, Eq, PartialEq, Debug)]
+	#[derive(Encode, Decode, Eq, PartialEq, Debug, TypeInfo)]
 	pub enum StorageVersion {
 		V1,
 		V2MakeLocVoid,

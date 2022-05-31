@@ -1,7 +1,6 @@
 use frame_support::codec::{Decode, Encode};
-use frame_support::debug;
 use frame_support::traits::Get;
-use frame_support::traits::Vec;
+use frame_support::dispatch::Vec;
 use frame_support::weights::Weight;
 
 use crate::{Config, File, LegalOfficerCaseOf, LocLink, LocMap, LocType, MetadataItem, pallet, PalletStorageVersion, StorageVersion};
@@ -12,17 +11,16 @@ pub fn migrate<T: Config>() -> Weight {
 
 fn do_migrate<T: Config, F>(from: StorageVersion, migration_fn: F) -> Weight
 	where F: FnOnce() -> Weight {
-	debug::RuntimeLogger::init();
 	let stored_version = <PalletStorageVersion<T>>::try_get();
 	let to: StorageVersion = Default::default();
 	if stored_version.is_err() || stored_version.unwrap() == from {
-		debug::info!("Starting to migrate from {:?} to {:?}", from, &to);
+		log::info!("Starting to migrate from {:?} to {:?}", from, &to);
 		let weight = migration_fn();
 		<PalletStorageVersion<T>>::put(&to);
-		debug::info!("Migration ended.");
+		log::info!("Migration ended.");
 		weight
 	} else {
-		debug::info!("The migration {:?} to {:?} was already applied.", from, &to);
+		log::info!("The migration {:?} to {:?} was already applied.", from, &to);
 		0
 	}
 }
@@ -50,8 +48,8 @@ mod v4 {
 	pub(crate) fn migrate<T: Config>() -> Weight {
 		<LocMap<T>>::translate::<LegalOfficerCaseOfV4<T>, _>(
 			|loc_id: T::LocId, loc: LegalOfficerCaseOfV4<T>| {
-				debug::info!("Migrating LOC: {:?}", loc_id);
-				debug::info!("From: {:?}", loc);
+				log::info!("Migrating LOC: {:?}", loc_id);
+				log::info!("From: {:?}", loc);
 				let new_loc = LegalOfficerCaseOf::<T> {
 					owner: loc.owner.clone(),
 					requester: loc.requester.clone(),
@@ -65,7 +63,7 @@ mod v4 {
 					collection_last_block_submission: Option::None,
 					collection_max_size: Option::None,
 				};
-				debug::info!("To: {:?}", new_loc);
+				log::info!("To: {:?}", new_loc);
 				Some(new_loc)
 			}
 		);
