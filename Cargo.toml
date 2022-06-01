@@ -15,12 +15,12 @@ targets = ['x86_64-unknown-linux-gnu']
 
 [dependencies]
 codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = ["derive", "max-encoded-len"] }
-scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
 frame-benchmarking = { git = "https://github.com/paritytech/substrate", default-features = false, optional = true, branch = "polkadot-v0.9.22" }
 frame-support = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.22" }
 frame-system = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.22" }
 log = { version = "0.4.14", default-features = false }
 logion-shared = { git = "https://github.com/logion-network/logion-shared", default-features = false, branch = "polkadot-v0.9.22" }
+scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
 sp-std = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.22" }
 
 [dev-dependencies]
@@ -35,8 +35,8 @@ std = [
 	'codec/std',
 	'frame-support/std',
 	'frame-system/std',
-	'frame-benchmarking/std',
 	'log/std',
+	'scale-info/std',
 	'sp-std/std',
 ]
 runtime-benchmarks = [
