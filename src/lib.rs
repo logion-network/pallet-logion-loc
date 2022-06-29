@@ -85,14 +85,28 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber> {
 	replacer_of: Option<LocId>,
 	collection_last_block_submission: Option<BlockNumber>,
 	collection_max_size: Option<CollectionSize>,
+	collection_can_upload: bool,
 }
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId, <T as frame_system::Config>::BlockNumber>;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
-pub struct CollectionItem {
-	description: Vec<u8>
+pub struct CollectionItem<Hash> {
+	description: Vec<u8>,
+	files: Vec<CollectionItemFile<Hash>>,
 }
+
+pub type CollectionItemOf<T> = CollectionItem<<T as pallet::Config>::Hash>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+pub struct CollectionItemFile<Hash> {
+	name: Vec<u8>,
+	content_type: Vec<u8>,
+	size: u32,
+	hash: Hash,
+}
+
+pub type CollectionItemFileOf<T> = CollectionItemFile<<T as pallet::Config>::Hash>;
 
 pub mod weights;
 
@@ -166,7 +180,7 @@ pub mod pallet {
 	/// Collection items by LOC ID.
 	#[pallet::storage]
 	#[pallet::getter(fn collection_items)]
-	pub type CollectionItemsMap<T> = StorageDoubleMap<_, Blake2_128Concat, <T as Config>::LocId, Blake2_128Concat, <T as Config>::CollectionItemId, CollectionItem>;
+	pub type CollectionItemsMap<T> = StorageDoubleMap<_, Blake2_128Concat, <T as Config>::LocId, Blake2_128Concat, <T as Config>::CollectionItemId, CollectionItemOf<T>>;
 
 	/// Collection size by LOC ID.
 	#[pallet::storage]
@@ -233,6 +247,8 @@ pub mod pallet {
 		FileInvalid,
 		/// Link cannot be added to given LOC because submitted data are invalid
 		LocLinkInvalid,
+		/// Cannot attach files to this item because the Collection LOC does allow it
+		CannotUpload,
 	}
 
 	#[pallet::hooks]
@@ -245,11 +261,12 @@ pub mod pallet {
 		V3RequesterEnum,
 		V4ItemSubmitter,
 		V5Collection,
+		V6ItemUpload,
 	}
 
 	impl Default for StorageVersion {
 		fn default() -> StorageVersion {
-			return StorageVersion::V5Collection;
+			return StorageVersion::V6ItemUpload;
 		}
 	}
 
@@ -370,6 +387,7 @@ pub mod pallet {
 			requester_account_id: T::AccountId,
 			collection_last_block_submission: Option<T::BlockNumber>,
 			collection_max_size: Option<u32>,
+			collection_can_upload: bool,
 		) -> DispatchResultWithPostInfo {
 			T::CreateOrigin::ensure_origin(origin.clone())?;
 			let who = ensure_signed(origin)?;
@@ -382,7 +400,13 @@ pub mod pallet {
 				Err(Error::<T>::AlreadyExists)?
 			} else {
 				let requester = RequesterOf::<T>::Account(requester_account_id.clone());
-				let loc = Self::build_open_collection_loc(&who, &requester, collection_last_block_submission, collection_max_size);
+				let loc = Self::build_open_collection_loc(
+					&who,
+					&requester,
+					collection_last_block_submission,
+					collection_max_size,
+					collection_can_upload,
+				);
 
 				<LocMap<T>>::insert(loc_id, loc);
 				Self::link_with_account(&requester_account_id, &loc_id);
@@ -554,6 +578,7 @@ pub mod pallet {
 			#[pallet::compact] collection_loc_id: T::LocId,
 			item_id: T::CollectionItemId,
 			item_description: Vec<u8>,
+			item_files: Vec<CollectionItemFileOf<T>>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
@@ -574,8 +599,12 @@ pub mod pallet {
 					if Self::collection_limits_reached(&collection_loc_id, &collection_loc) {
 						Err(Error::<T>::CollectionLimitsReached)?
 					}
+					if !collection_loc.collection_can_upload && item_files.len() > 0 {
+						Err(Error::<T>::CannotUpload)?
+					}
 					let item = CollectionItem {
 						description: item_description.clone(),
+						files: item_files.clone(),
 					};
 					<CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
 					let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
@@ -744,6 +773,7 @@ pub mod pallet {
 				replacer_of: None,
 				collection_last_block_submission: Option::None,
 				collection_max_size: Option::None,
+				collection_can_upload: false,
 			}
 		}
 
@@ -752,6 +782,7 @@ pub mod pallet {
 			requester: &RequesterOf<T>,
 			collection_last_block_submission: Option<T::BlockNumber>,
 			collection_max_size: Option<CollectionSize>,
+			collection_can_upload: bool,
 		) -> LegalOfficerCaseOf<T> {
 			LegalOfficerCaseOf::<T> {
 				owner: who.clone(),
@@ -765,6 +796,7 @@ pub mod pallet {
 				replacer_of: None,
 				collection_last_block_submission: collection_last_block_submission.clone(),
 				collection_max_size: collection_max_size.clone(),
+				collection_can_upload,
 			}
 		}
 
