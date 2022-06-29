@@ -247,7 +247,7 @@ pub mod pallet {
 		FileInvalid,
 		/// Link cannot be added to given LOC because submitted data are invalid
 		LocLinkInvalid,
-		/// Cannot attach files to this item because the Collection LOC does allow it
+		/// Cannot attach files to this item because the Collection LOC does not allow it
 		CannotUpload,
 	}
 
