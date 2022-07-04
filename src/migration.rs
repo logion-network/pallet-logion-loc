@@ -6,7 +6,7 @@ use frame_support::weights::Weight;
 use crate::{Config, File, LegalOfficerCaseOf, LocLink, LocMap, LocType, MetadataItem, pallet, PalletStorageVersion, StorageVersion};
 
 pub fn migrate<T: Config>() -> Weight {
-	do_migrate::<T, _>(StorageVersion::V4ItemSubmitter, v4::migrate::<T>)
+	do_migrate::<T, _>(StorageVersion::V5Collection, v5::migrate::<T>)
 }
 
 fn do_migrate<T: Config, F>(from: StorageVersion, migration_fn: F) -> Weight
@@ -25,13 +25,13 @@ fn do_migrate<T: Config, F>(from: StorageVersion, migration_fn: F) -> Weight
 	}
 }
 
-mod v4 {
-	use crate::{LocVoidInfo, Requester};
+mod v5 {
+	use crate::{LocVoidInfo, Requester, CollectionSize};
 
 	use super::*;
 
 	#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug)]
-	struct LegalOfficerCaseV4<AccountId, Hash, LocId> {
+	struct LegalOfficerCaseV5<AccountId, Hash, LocId, BlockNumber> {
 		owner: AccountId,
 		requester: Requester<AccountId, LocId>,
 		metadata: Vec<MetadataItem<AccountId>>,
@@ -41,13 +41,15 @@ mod v4 {
 		links: Vec<LocLink<LocId>>,
 		void_info: Option<LocVoidInfo<LocId>>,
 		replacer_of: Option<LocId>,
+		collection_last_block_submission: Option<BlockNumber>,
+		collection_max_size: Option<CollectionSize>,
 	}
 
-	type LegalOfficerCaseOfV4<T> = LegalOfficerCaseV4<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId>;
+	type LegalOfficerCaseOfV5<T> = LegalOfficerCaseV5<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId, <T as frame_system::Config>::BlockNumber>;
 
 	pub(crate) fn migrate<T: Config>() -> Weight {
-		<LocMap<T>>::translate::<LegalOfficerCaseOfV4<T>, _>(
-			|loc_id: T::LocId, loc: LegalOfficerCaseOfV4<T>| {
+		<LocMap<T>>::translate::<LegalOfficerCaseOfV5<T>, _>(
+			|loc_id: T::LocId, loc: LegalOfficerCaseOfV5<T>| {
 				log::info!("Migrating LOC: {:?}", loc_id);
 				log::info!("From: {:?}", loc);
 				let new_loc = LegalOfficerCaseOf::<T> {
@@ -60,8 +62,9 @@ mod v4 {
 					links: loc.links.clone(),
 					void_info: loc.void_info.clone(),
 					replacer_of: loc.replacer_of.clone(),
-					collection_last_block_submission: Option::None,
-					collection_max_size: Option::None,
+					collection_last_block_submission: loc.collection_last_block_submission.clone(),
+					collection_max_size: loc.collection_max_size.clone(),
+					collection_can_upload: false,
 				};
 				log::info!("To: {:?}", new_loc);
 				Some(new_loc)

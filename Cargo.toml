@@ -7,7 +7,7 @@ license = 'Apache-2.0'
 name = 'pallet-logion-loc'
 readme = 'README.md'
 repository = 'https://github.com/logion-network/pallet-logion-loc'
-version = '0.1.0'
+version = '0.1.1'
 keywords = ['logion']
 
 [package.metadata.docs.rs]
@@ -22,6 +22,7 @@ log = { version = "0.4.14", default-features = false }
 logion-shared = { git = "https://github.com/logion-network/logion-shared", default-features = false, branch = "polkadot-v0.9.22" }
 scale-info = { version = "2.1.1", default-features = false, features = ["derive"] }
 sp-std = { git = "https://github.com/paritytech/substrate", default-features = false, branch = "polkadot-v0.9.22" }
+syn = "=1.0.96"
 
 [dev-dependencies]
 serde = { version = "1.0.137", features = ["derive"] }
