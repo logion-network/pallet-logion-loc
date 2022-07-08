@@ -113,6 +113,8 @@ pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
+	use std::collections::HashSet;
+	use std::hash::Hash;
 	use frame_system::pallet_prelude::*;
 	use frame_support::{
 		dispatch::DispatchResultWithPostInfo,
@@ -129,7 +131,7 @@ pub mod pallet {
 		type LocId: Member + Parameter + Default + Copy + HasCompact;
 
 		/// Type for hashes stored in LOCs
-		type Hash: Member + Parameter + Default + Copy;
+		type Hash: Member + Parameter + Default + Copy + Hash;
 
 		/// The origin (must be signed) which can create a LOC.
 		type CreateOrigin: EnsureOrigin<Self::Origin>;
@@ -250,6 +252,10 @@ pub mod pallet {
 		LocLinkInvalid,
 		/// Cannot attach files to this item because the Collection LOC does not allow it
 		CannotUpload,
+		/// Must attach at least one file
+		MustUpload,
+		/// Cannot attach same file multiple times
+		DuplicateFile,
 	}
 
 	#[pallet::hooks]
@@ -603,6 +609,18 @@ pub mod pallet {
 					if !collection_loc.collection_can_upload && item_files.len() > 0 {
 						Err(Error::<T>::CannotUpload)?
 					}
+					if collection_loc.collection_can_upload {
+						if item_files.len() == 0 {
+							Err(Error::<T>::MustUpload)?
+						} else {
+							let files_hashes: Vec<<T as Config>::Hash> = item_files.iter()
+								.map(|file| file.hash)
+								.collect();
+							if !Self::has_unique_elements(&files_hashes) {
+								Err(Error::<T>::DuplicateFile)?
+							}
+						}
+					}
 					let item = CollectionItem {
 						description: item_description.clone(),
 						files: item_files.clone(),
@@ -813,6 +831,15 @@ pub mod pallet {
 			let current_block_number = <frame_system::Pallet<T>>::block_number();
 			return match collection_loc.collection_max_size { None => false, Some(limit) => collection_size >= limit }
 				|| match collection_loc.collection_last_block_submission { None => false, Some(last_block) => current_block_number >= last_block };
+		}
+
+		fn has_unique_elements<I>(iter: I) -> bool
+			where
+				I: IntoIterator,
+				I::Item: Eq + Hash,
+		{
+			let mut uniq = HashSet::new();
+			iter.into_iter().all(move |x| uniq.insert(x))
 		}
 	}
 
