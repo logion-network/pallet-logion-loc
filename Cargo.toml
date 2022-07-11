@@ -7,7 +7,7 @@ license = 'Apache-2.0'
 name = 'pallet-logion-loc'
 readme = 'README.md'
 repository = 'https://github.com/logion-network/pallet-logion-loc'
-version = '0.2.1'
+version = '0.2.2'
 keywords = ['logion']
 
 [package.metadata.docs.rs]
