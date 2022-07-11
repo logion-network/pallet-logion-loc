@@ -113,8 +113,7 @@ pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use std::collections::HashSet;
-	use std::hash::Hash;
+	use sp_std::collections::btree_set::BTreeSet;
 	use frame_system::pallet_prelude::*;
 	use frame_support::{
 		dispatch::DispatchResultWithPostInfo,
@@ -131,7 +130,7 @@ pub mod pallet {
 		type LocId: Member + Parameter + Default + Copy + HasCompact;
 
 		/// Type for hashes stored in LOCs
-		type Hash: Member + Parameter + Default + Copy + Hash;
+		type Hash: Member + Parameter + Default + Copy + Ord;
 
 		/// The origin (must be signed) which can create a LOC.
 		type CreateOrigin: EnsureOrigin<Self::Origin>;
@@ -836,9 +835,9 @@ pub mod pallet {
 		fn has_unique_elements<I>(iter: I) -> bool
 			where
 				I: IntoIterator,
-				I::Item: Eq + Hash,
+				I::Item: Ord,
 		{
-			let mut uniq = HashSet::new();
+			let mut uniq = BTreeSet::new();
 			iter.into_iter().all(move |x| uniq.insert(x))
 		}
 	}
