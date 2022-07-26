@@ -22,23 +22,41 @@ pub mod v7 {
 	impl<T: Config> OnRuntimeUpgrade for AddTokenToCollectionItem<T> {
 
 		fn on_runtime_upgrade() -> Weight {
-			if PalletStorageVersion::<T>::get() == StorageVersion::V6ItemUpload {
-				CollectionItemsMap::<T>::translate(|_loc_id: T::LocId, _item_id: T::CollectionItemId, item: CollectionItemV6Of<T>| {
-					let new_item = CollectionItemOf::<T> {
-						description: item.description.clone(),
-						files: item.files.clone(),
-						token: Option::None,
-					};
-					Some(new_item)
-				});
-
-				PalletStorageVersion::<T>::set(StorageVersion::V7ItemToken);
-				T::BlockWeights::get().max_block
-			} else {
-				log::warn!("AddTokenToCollectionItem being executed on the wrong storage version, expected StorageVersion::V6ItemUpload");
-				T::DbWeight::get().reads(1)
-			}
+			super::do_storage_upgrade::<T, _>(
+				StorageVersion::V6ItemUpload, 
+				StorageVersion::V7ItemToken, 
+				"AddTokenToCollectionItem",
+				|| {
+					CollectionItemsMap::<T>::translate(|_loc_id: T::LocId, _item_id: T::CollectionItemId, item: CollectionItemV6Of<T>| {
+						let new_item = CollectionItemOf::<T> {
+							description: item.description.clone(),
+							files: item.files.clone(),
+							token: Option::None,
+						};
+						Some(new_item)
+					});
+				}
+			)
 		}
+	}
+}
+
+fn do_storage_upgrade<T: Config, F>(expected_version: StorageVersion, target_version: StorageVersion, migration_name: &str, migration: F) -> Weight
+where F: FnOnce() -> () {
+	let storage_version = PalletStorageVersion::<T>::get();
+	if storage_version == expected_version {
+		migration();
+
+		PalletStorageVersion::<T>::set(target_version);
+		log::info!("✅ {:?} migration successfully exected", migration_name);
+		T::BlockWeights::get().max_block
+	} else {
+		if storage_version != target_version {
+			log::warn!("❗ {:?} cannot run migration with storage version {:?} (expected {:?})", migration_name, storage_version, expected_version);
+		} else {
+			log::warn!("❎ {:?} execution skipped, was already applied", migration_name);
+		}
+		0
 	}
 }
 
