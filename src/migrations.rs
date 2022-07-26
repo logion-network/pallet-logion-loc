@@ -54,7 +54,7 @@ where F: FnOnce() -> () {
 		if storage_version != target_version {
 			log::warn!("❗ {:?} cannot run migration with storage version {:?} (expected {:?})", migration_name, storage_version, expected_version);
 		} else {
-			log::warn!("❎ {:?} execution skipped, was already applied", migration_name);
+			log::warn!("❎ {:?} execution skipped, already at target version {:?}", migration_name, target_version);
 		}
 		0
 	}
