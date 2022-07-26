@@ -630,7 +630,7 @@ fn it_fails_adding_item_if_no_files_attached_but_upload_enabled() {
 
 		let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
 		let collection_item_description = "item-description".as_bytes().to_vec();
-		assert_err!(LogionLoc::add_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, vec![]), Error::<Test>::MustUpload);
+		assert_err!(LogionLoc::add_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, vec![], Option::None), Error::<Test>::MustUpload);
 	});
 }
 
@@ -740,7 +740,7 @@ fn it_adds_item_with_two_files_attached() {
 				size: 789,
 			},
 		];
-		assert_ok!(LogionLoc::add_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files));
+		assert_ok!(LogionLoc::add_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, Option::None));
 	});
 }
 
@@ -767,6 +767,6 @@ fn it_fails_to_add_item_with_duplicate_hash() {
 				size: 789,
 			},
 		];
-		assert_err!(LogionLoc::add_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files), Error::<Test>::DuplicateFile);
+		assert_err!(LogionLoc::add_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, Option::None), Error::<Test>::DuplicateFile);
 	});
 }
