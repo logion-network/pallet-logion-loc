@@ -84,6 +84,8 @@ parameter_types! {
 	pub const MaxFileNatureSize: usize = 255;
 	pub const MaxLinkNatureSize: usize = 255;
 	pub const MaxCollectionItemDescriptionSize: usize = 4096;
+	pub const MaxCollectionItemTokenIdSize: usize = 255;
+	pub const MaxCollectionItemTokenTypeSize: usize = 255;
 }
 
 impl pallet_loc::Config for Test {
@@ -97,6 +99,8 @@ impl pallet_loc::Config for Test {
 	type MaxLinkNatureSize = MaxLinkNatureSize;
 	type CollectionItemId = H256;
 	type MaxCollectionItemDescriptionSize = MaxCollectionItemDescriptionSize;
+	type MaxCollectionItemTokenIdSize = MaxCollectionItemTokenIdSize;
+	type MaxCollectionItemTokenTypeSize = MaxCollectionItemTokenTypeSize;
 	type WeightInfo = ();
 }
 

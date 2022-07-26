@@ -2,7 +2,7 @@
 
 pub use pallet::*;
 
-mod migration;
+pub mod migrations;
 
 #[cfg(test)]
 mod mock;
@@ -95,6 +95,7 @@ pub type LegalOfficerCaseOf<T> = LegalOfficerCase<<T as frame_system::Config>::A
 pub struct CollectionItem<Hash> {
 	description: Vec<u8>,
 	files: Vec<CollectionItemFile<Hash>>,
+	token: Option<CollectionItemToken>,
 }
 
 pub type CollectionItemOf<T> = CollectionItem<<T as pallet::Config>::Hash>;
@@ -108,6 +109,12 @@ pub struct CollectionItemFile<Hash> {
 }
 
 pub type CollectionItemFileOf<T> = CollectionItemFile<<T as pallet::Config>::Hash>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+pub struct CollectionItemToken {
+	token_type: Vec<u8>,
+	token_id: Vec<u8>,
+}
 
 pub mod weights;
 
@@ -158,6 +165,12 @@ pub mod pallet {
 
 		/// The maximum size of a Collection Item description
 		type MaxCollectionItemDescriptionSize: Get<usize>;
+
+		/// The maximum size of a Collection Item Token Type
+		type MaxCollectionItemTokenTypeSize: Get<usize>;
+
+		/// The maximum size of a Collection Item Token ID
+		type MaxCollectionItemTokenIdSize: Get<usize>;
 	}
 
 	#[pallet::pallet]
@@ -268,11 +281,12 @@ pub mod pallet {
 		V4ItemSubmitter,
 		V5Collection,
 		V6ItemUpload,
+		V7ItemToken,
 	}
 
 	impl Default for StorageVersion {
 		fn default() -> StorageVersion {
-			return StorageVersion::V6ItemUpload;
+			return StorageVersion::V7ItemToken;
 		}
 	}
 
@@ -585,10 +599,19 @@ pub mod pallet {
 			item_id: T::CollectionItemId,
 			item_description: Vec<u8>,
 			item_files: Vec<CollectionItemFileOf<T>>,
+			item_token: Option<CollectionItemToken>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			if item_description.len() > T::MaxCollectionItemDescriptionSize::get() {
+				Err(Error::<T>::CollectionItemInvalid)?
+			}
+
+			if item_token.is_some() && item_token.as_ref().unwrap().token_type.len() > T::MaxCollectionItemTokenTypeSize::get() {
+				Err(Error::<T>::CollectionItemInvalid)?
+			}
+
+			if item_token.is_some() && item_token.as_ref().unwrap().token_id.len() > T::MaxCollectionItemTokenIdSize::get() {
 				Err(Error::<T>::CollectionItemInvalid)?
 			}
 
@@ -623,6 +646,7 @@ pub mod pallet {
 					let item = CollectionItem {
 						description: item_description.clone(),
 						files: item_files.clone(),
+						token: item_token.clone(),
 					};
 					<CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
 					let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
@@ -840,9 +864,5 @@ pub mod pallet {
 			let mut uniq = BTreeSet::new();
 			iter.into_iter().all(move |x| uniq.insert(x))
 		}
-	}
-
-	pub fn migrate<T: Config>() -> Weight {
-		migration::migrate::<T>()
 	}
 }
