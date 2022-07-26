@@ -2,30 +2,47 @@ use frame_support::codec::{Decode, Encode};
 use frame_support::traits::Get;
 use frame_support::dispatch::Vec;
 use frame_support::weights::Weight;
+use frame_support::traits::OnRuntimeUpgrade;
 
 use crate::{Config, File, LegalOfficerCaseOf, LocLink, LocMap, LocType, MetadataItem, pallet, PalletStorageVersion, StorageVersion};
 
-pub fn migrate<T: Config>() -> Weight {
-	do_migrate::<T, _>(StorageVersion::V5Collection, v5::migrate::<T>)
-}
+pub mod v7 {
+	use super::*;
+	use crate::{CollectionItemFile, CollectionItemsMap, CollectionItemOf};
 
-fn do_migrate<T: Config, F>(from: StorageVersion, migration_fn: F) -> Weight
-	where F: FnOnce() -> Weight {
-	let stored_version = <PalletStorageVersion<T>>::try_get();
-	let to: StorageVersion = Default::default();
-	if stored_version.is_err() || stored_version.unwrap() == from {
-		log::info!("Starting to migrate from {:?} to {:?}", from, &to);
-		let weight = migration_fn();
-		<PalletStorageVersion<T>>::put(&to);
-		log::info!("Migration ended.");
-		weight
-	} else {
-		log::info!("The migration {:?} to {:?} was already applied.", from, &to);
-		0
+	#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+	struct CollectionItemV6<Hash> {
+		description: Vec<u8>,
+		files: Vec<CollectionItemFile<Hash>>,
+	}
+
+	type CollectionItemV6Of<T> = CollectionItemV6<<T as pallet::Config>::Hash>;
+
+	pub struct AddTokenToCollectionItem<T>(sp_std::marker::PhantomData<T>);
+	impl<T: Config> OnRuntimeUpgrade for AddTokenToCollectionItem<T> {
+
+		fn on_runtime_upgrade() -> Weight {
+			if PalletStorageVersion::<T>::get() == StorageVersion::V6ItemUpload {
+				CollectionItemsMap::<T>::translate(|_loc_id: T::LocId, _item_id: T::CollectionItemId, item: CollectionItemV6Of<T>| {
+					let new_item = CollectionItemOf::<T> {
+						description: item.description.clone(),
+						files: item.files.clone(),
+						token: Option::None,
+					};
+					Some(new_item)
+				});
+
+				PalletStorageVersion::<T>::set(StorageVersion::V7ItemToken);
+				T::BlockWeights::get().max_block
+			} else {
+				log::warn!("AddTokenToCollectionItem being executed on the wrong storage version, expected StorageVersion::V6ItemUpload");
+				T::DbWeight::get().reads(1)
+			}
+		}
 	}
 }
 
-mod v5 {
+pub mod v6 {
 	use crate::{LocVoidInfo, Requester, CollectionSize};
 
 	use super::*;
@@ -47,7 +64,7 @@ mod v5 {
 
 	type LegalOfficerCaseOfV5<T> = LegalOfficerCaseV5<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId, <T as frame_system::Config>::BlockNumber>;
 
-	pub(crate) fn migrate<T: Config>() -> Weight {
+	pub fn migrate<T: Config>() -> Weight {
 		<LocMap<T>>::translate::<LegalOfficerCaseOfV5<T>, _>(
 			|loc_id: T::LocId, loc: LegalOfficerCaseOfV5<T>| {
 				log::info!("Migrating LOC: {:?}", loc_id);
