@@ -96,6 +96,7 @@ pub struct CollectionItem<Hash> {
 	description: Vec<u8>,
 	files: Vec<CollectionItemFile<Hash>>,
 	token: Option<CollectionItemToken>,
+	restricted_delivery: bool,
 }
 
 pub type CollectionItemOf<T> = CollectionItem<<T as pallet::Config>::Hash>;
@@ -252,8 +253,8 @@ pub mod pallet {
 		WrongCollectionLoc,
 		/// An item with same identifier already exists in the collection
 		CollectionItemAlreadyExists,
-		/// Collection Item cannot be added to given collection because submitted data are invalid
-		CollectionItemInvalid,
+		/// Collection Item cannot be added to given collection because some fields contain too many bytes
+		CollectionItemTooMuchData,
 		/// The collection limits have been reached
 		CollectionLimitsReached,
 		/// Metadata Item cannot be added to given LOC because submitted data are invalid
@@ -268,6 +269,10 @@ pub mod pallet {
 		MustUpload,
 		/// Cannot attach same file multiple times
 		DuplicateFile,
+		/// Collection items with restricted delivery require an underlying token to be defined
+		MissingToken,
+		/// Collection items with restricted delivery require at least one associated file
+		MissingFiles,
 	}
 
 	#[pallet::hooks]
@@ -600,19 +605,28 @@ pub mod pallet {
 			item_description: Vec<u8>,
 			item_files: Vec<CollectionItemFileOf<T>>,
 			item_token: Option<CollectionItemToken>,
+			restricted_delivery: bool,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			if item_description.len() > T::MaxCollectionItemDescriptionSize::get() {
-				Err(Error::<T>::CollectionItemInvalid)?
+				Err(Error::<T>::CollectionItemTooMuchData)?
 			}
 
 			if item_token.is_some() && item_token.as_ref().unwrap().token_type.len() > T::MaxCollectionItemTokenTypeSize::get() {
-				Err(Error::<T>::CollectionItemInvalid)?
+				Err(Error::<T>::CollectionItemTooMuchData)?
 			}
 
 			if item_token.is_some() && item_token.as_ref().unwrap().token_id.len() > T::MaxCollectionItemTokenIdSize::get() {
-				Err(Error::<T>::CollectionItemInvalid)?
+				Err(Error::<T>::CollectionItemTooMuchData)?
+			}
+
+			if restricted_delivery && item_token.is_none() {
+				Err(Error::<T>::MissingToken)?
+			}
+
+			if restricted_delivery && item_files.len() == 0 {
+				Err(Error::<T>::MissingFiles)?
 			}
 
 			let collection_loc_option = <LocMap<T>>::get(&collection_loc_id);
@@ -647,6 +661,7 @@ pub mod pallet {
 						description: item_description.clone(),
 						files: item_files.clone(),
 						token: item_token.clone(),
+						restricted_delivery,
 					};
 					<CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
 					let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);

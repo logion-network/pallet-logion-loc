@@ -32,6 +32,7 @@ pub mod v7 {
 							description: item.description.clone(),
 							files: item.files.clone(),
 							token: Option::None,
+							restricted_delivery: false,
 						};
 						Some(new_item)
 					});
