@@ -4,7 +4,7 @@ use frame_support::dispatch::Vec;
 use frame_support::weights::Weight;
 use frame_support::traits::OnRuntimeUpgrade;
 
-use crate::{Config, File, LegalOfficerCaseOf, LocLink, LocMap, LocType, MetadataItem, pallet, PalletStorageVersion, StorageVersion};
+use crate::{Config, File, LegalOfficerCaseOf, LocLink, LocMap, LocType, MetadataItem, pallet, PalletStorageVersion, pallet::StorageVersion};
 
 pub mod v7 {
 	use super::*;
