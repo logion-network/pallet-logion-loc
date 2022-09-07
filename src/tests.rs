@@ -28,6 +28,7 @@ fn it_creates_loc() {
 			collection_last_block_submission: Option::None,
 			collection_max_size: Option::None,
 			collection_can_upload: false,
+			seal: Option::None,
 		}));
 	});
 }
@@ -355,6 +356,7 @@ fn it_closes_loc() {
 		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOC_ID));
 		let loc = LogionLoc::loc(LOC_ID).unwrap();
 		assert!(loc.closed);
+		assert!(loc.seal.is_none());
 	});
 }
 
@@ -501,6 +503,7 @@ fn it_creates_collection_loc() {
 			collection_last_block_submission: Option::None,
 			collection_max_size: Option::Some(10),
 			collection_can_upload: false,
+			seal: Option::None,
 		}));
 	});
 }
@@ -804,5 +807,18 @@ fn it_fails_to_add_item_with_duplicate_hash() {
 			},
 		];
 		assert_err!(LogionLoc::add_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, Option::None, false), Error::<Test>::DuplicateFile);
+	});
+}
+
+#[test]
+fn it_closes_and_seals_loc() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), LOC_ID, LOC_REQUESTER_ID));
+		let seal = BlakeTwo256::hash_of(&"some external private data".as_bytes().to_vec());
+		assert_ok!(LogionLoc::close_and_seal(Origin::signed(LOC_OWNER1), LOC_ID, seal));
+		let loc = LogionLoc::loc(LOC_ID).unwrap();
+		assert!(loc.closed);
+		assert!(loc.seal.is_some());
+		assert_eq!(loc.seal.unwrap(), seal);
 	});
 }

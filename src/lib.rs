@@ -87,6 +87,7 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber> {
 	collection_last_block_submission: Option<BlockNumber>,
 	collection_max_size: Option<CollectionSize>,
 	collection_can_upload: bool,
+	seal: Option<Hash>,
 }
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId, <T as frame_system::Config>::BlockNumber>;
@@ -287,11 +288,12 @@ pub mod pallet {
 		V5Collection,
 		V6ItemUpload,
 		V7ItemToken,
+		V8AddSeal,
 	}
 
 	impl Default for StorageVersion {
 		fn default() -> StorageVersion {
-			return StorageVersion::V7ItemToken;
+			return StorageVersion::V8AddSeal;
 		}
 	}
 
@@ -553,28 +555,17 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			#[pallet::compact] loc_id: T::LocId,
 		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
+			Self::do_close(origin, loc_id, None)
+		}
 
-			if ! <LocMap<T>>::contains_key(&loc_id) {
-				Err(Error::<T>::NotFound)?
-			} else {
-				let loc = <LocMap<T>>::get(&loc_id).unwrap();
-				if loc.owner != who {
-					Err(Error::<T>::Unauthorized)?
-				} else if loc.void_info.is_some() {
-					Err(Error::<T>::CannotMutateVoid)?
-				} else if loc.closed {
-					Err(Error::<T>::AlreadyClosed)?
-				} else {
-					<LocMap<T>>::mutate(loc_id, |loc| {
-						let mutable_loc = loc.as_mut().unwrap();
-						mutable_loc.closed = true;
-					});
-
-					Self::deposit_event(Event::LocClosed(loc_id));
-					Ok(().into())
-				}
-			}
+		/// Close and seal LOC.
+		#[pallet::weight(T::WeightInfo::close())]
+		pub fn close_and_seal(
+			origin: OriginFor<T>,
+			#[pallet::compact] loc_id: T::LocId,
+			seal: <T as Config>::Hash,
+		) -> DispatchResultWithPostInfo {
+			Self::do_close(origin, loc_id, Some(seal))
 		}
 
 		/// Make a LOC void.
@@ -831,6 +822,7 @@ pub mod pallet {
 				collection_last_block_submission: Option::None,
 				collection_max_size: Option::None,
 				collection_can_upload: false,
+				seal: Option::None,
 			}
 		}
 
@@ -854,6 +846,7 @@ pub mod pallet {
 				collection_last_block_submission: collection_last_block_submission.clone(),
 				collection_max_size: collection_max_size.clone(),
 				collection_can_upload,
+				seal: Option::None,
 			}
 		}
 
@@ -878,6 +871,36 @@ pub mod pallet {
 		{
 			let mut uniq = BTreeSet::new();
 			iter.into_iter().all(move |x| uniq.insert(x))
+		}
+
+		fn do_close(
+			origin: OriginFor<T>,
+			loc_id: T::LocId,
+			seal: Option<<T as Config>::Hash>,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			if ! <LocMap<T>>::contains_key(&loc_id) {
+				Err(Error::<T>::NotFound)?
+			} else {
+				let loc = <LocMap<T>>::get(&loc_id).unwrap();
+				if loc.owner != who {
+					Err(Error::<T>::Unauthorized)?
+				} else if loc.void_info.is_some() {
+					Err(Error::<T>::CannotMutateVoid)?
+				} else if loc.closed {
+					Err(Error::<T>::AlreadyClosed)?
+				} else {
+					<LocMap<T>>::mutate(loc_id, |loc| {
+						let mutable_loc = loc.as_mut().unwrap();
+						mutable_loc.closed = true;
+						mutable_loc.seal = seal;
+					});
+
+					Self::deposit_event(Event::LocClosed(loc_id));
+					Ok(().into())
+				}
+			}
 		}
 	}
 }
