@@ -293,7 +293,7 @@ pub mod pallet {
 
 	impl Default for StorageVersion {
 		fn default() -> StorageVersion {
-			return StorageVersion::V8AddSeal;
+			return StorageVersion::V7ItemToken;
 		}
 	}
 
