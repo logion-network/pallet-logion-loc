@@ -5,7 +5,7 @@ use sp_runtime::traits::Hash;
 
 use logion_shared::LocQuery;
 
-use crate::{File, LegalOfficerCase, LocLink, LocType, MetadataItem, CollectionItem, CollectionItemFile, CollectionItemToken, mock::*};
+use crate::{File, LegalOfficerCase, LocLink, LocType, MetadataItem, CollectionItem, CollectionItemFile, CollectionItemToken, mock::*, License, LicenseItem};
 use crate::Error;
 
 const LOC_ID: u32 = 0;
@@ -539,6 +539,52 @@ fn it_adds_item_to_closed_collection_loc() {
 			files: vec![],
 			token: Option::None,
 			restricted_delivery: false,
+			license: License::None,
+		}));
+		assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
+	});
+}
+
+#[test]
+fn it_adds_item_with_specific_license_to_closed_collection_loc() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(LogionLoc::create_collection_loc(Origin::signed(LOC_OWNER1), LOC_ID, LOC_REQUESTER_ID, Option::None, Option::Some(10), false));
+		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOC_ID));
+
+		let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+		let collection_item_description = "item-description".as_bytes().to_vec();
+		let license_hash = BlakeTwo256::hash_of(&"Specific License Content");
+		assert_ok!(LogionLoc::add_licensed_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, License::Specific(license_hash)));
+		assert_eq!(LogionLoc::collection_items(LOC_ID, collection_item_id), Some(CollectionItem {
+			description: collection_item_description,
+			files: vec![],
+			token: Option::None,
+			restricted_delivery: false,
+			license: License::Specific(license_hash),
+		}));
+		assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
+	});
+}
+
+#[test]
+fn it_adds_item_with_logion_license_to_closed_collection_loc() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(LogionLoc::create_collection_loc(Origin::signed(LOC_OWNER1), LOC_ID, LOC_REQUESTER_ID, Option::None, Option::Some(10), false));
+		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOC_ID));
+
+		let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+		let collection_item_description = "item-description".as_bytes().to_vec();
+		let license_hash = BlakeTwo256::hash_of(&"Logion License Content");
+		let item1: LicenseItem = "ITEM-A".as_bytes().to_vec();
+		let item2: LicenseItem = "ITEM-B".as_bytes().to_vec();
+		let items: Vec<LicenseItem> = vec!(item1, item2);
+		assert_ok!(LogionLoc::add_licensed_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, License::Logion(license_hash, items.clone())));
+		assert_eq!(LogionLoc::collection_items(LOC_ID, collection_item_id), Some(CollectionItem {
+			description: collection_item_description,
+			files: vec![],
+			token: Option::None,
+			restricted_delivery: false,
+			license: License::Logion(license_hash, items.clone()),
 		}));
 		assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
 	});

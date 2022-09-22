@@ -92,12 +92,23 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber> {
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId, <T as frame_system::Config>::BlockNumber>;
 
+pub type LicenseItem = Vec<u8>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+pub enum License<Hash> {
+	#[default]
+	None,
+	Specific(Hash),
+	Logion(Hash, Vec<LicenseItem>)
+}
+
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct CollectionItem<Hash> {
 	description: Vec<u8>,
 	files: Vec<CollectionItemFile<Hash>>,
 	token: Option<CollectionItemToken>,
 	restricted_delivery: bool,
+	license: License<Hash>,
 }
 
 pub type CollectionItemOf<T> = CollectionItem<<T as pallet::Config>::Hash>;
@@ -289,11 +300,12 @@ pub mod pallet {
 		V6ItemUpload,
 		V7ItemToken,
 		V8AddSeal,
+		V9License,
 	}
 
 	impl Default for StorageVersion {
 		fn default() -> StorageVersion {
-			return StorageVersion::V7ItemToken;
+			return StorageVersion::V8AddSeal;
 		}
 	}
 
@@ -459,7 +471,7 @@ pub mod pallet {
 				Err(Error::<T>::MetadataItemInvalid)?
 			}
 
-			if ! <LocMap<T>>::contains_key(&loc_id) {
+			if !<LocMap<T>>::contains_key(&loc_id) {
 				Err(Error::<T>::NotFound)?
 			} else {
 				let loc = <LocMap<T>>::get(&loc_id).unwrap();
@@ -493,7 +505,7 @@ pub mod pallet {
 				Err(Error::<T>::FileInvalid)?
 			}
 
-			if ! <LocMap<T>>::contains_key(&loc_id) {
+			if !<LocMap<T>>::contains_key(&loc_id) {
 				Err(Error::<T>::NotFound)?
 			} else {
 				let loc = <LocMap<T>>::get(&loc_id).unwrap();
@@ -527,7 +539,7 @@ pub mod pallet {
 				Err(Error::<T>::LocLinkInvalid)?
 			}
 
-			if ! <LocMap<T>>::contains_key(&loc_id) {
+			if !<LocMap<T>>::contains_key(&loc_id) {
 				Err(Error::<T>::NotFound)?
 			} else {
 				let loc = <LocMap<T>>::get(&loc_id).unwrap();
@@ -537,7 +549,7 @@ pub mod pallet {
 					Err(Error::<T>::CannotMutate)?
 				} else if loc.void_info.is_some() {
 					Err(Error::<T>::CannotMutateVoid)?
-				} else if ! <LocMap<T>>::contains_key(&link.id) {
+				} else if !<LocMap<T>>::contains_key(&link.id) {
 					Err(Error::<T>::LinkedLocNotFound)?
 				} else {
 					<LocMap<T>>::mutate(loc_id, |loc| {
@@ -597,72 +609,20 @@ pub mod pallet {
 			item_files: Vec<CollectionItemFileOf<T>>,
 			item_token: Option<CollectionItemToken>,
 			restricted_delivery: bool,
-		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
+		) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, License::None) }
 
-			if item_description.len() > T::MaxCollectionItemDescriptionSize::get() {
-				Err(Error::<T>::CollectionItemTooMuchData)?
-			}
-
-			if item_token.is_some() && item_token.as_ref().unwrap().token_type.len() > T::MaxCollectionItemTokenTypeSize::get() {
-				Err(Error::<T>::CollectionItemTooMuchData)?
-			}
-
-			if item_token.is_some() && item_token.as_ref().unwrap().token_id.len() > T::MaxCollectionItemTokenIdSize::get() {
-				Err(Error::<T>::CollectionItemTooMuchData)?
-			}
-
-			if restricted_delivery && item_token.is_none() {
-				Err(Error::<T>::MissingToken)?
-			}
-
-			if restricted_delivery && item_files.len() == 0 {
-				Err(Error::<T>::MissingFiles)?
-			}
-
-			let collection_loc_option = <LocMap<T>>::get(&collection_loc_id);
-			match collection_loc_option {
-				None => Err(Error::<T>::WrongCollectionLoc)?,
-				Some(collection_loc) => {
-					if <CollectionItemsMap<T>>::contains_key(&collection_loc_id, &item_id) {
-						Err(Error::<T>::CollectionItemAlreadyExists)?
-					}
-					if ! Self::can_add_item(&who, &collection_loc) {
-						Err(Error::<T>::WrongCollectionLoc)?
-					}
-					if Self::collection_limits_reached(&collection_loc_id, &collection_loc) {
-						Err(Error::<T>::CollectionLimitsReached)?
-					}
-					if !collection_loc.collection_can_upload && item_files.len() > 0 {
-						Err(Error::<T>::CannotUpload)?
-					}
-					if collection_loc.collection_can_upload {
-						if item_files.len() == 0 {
-							Err(Error::<T>::MustUpload)?
-						} else {
-							let files_hashes: Vec<<T as Config>::Hash> = item_files.iter()
-								.map(|file| file.hash)
-								.collect();
-							if !Self::has_unique_elements(&files_hashes) {
-								Err(Error::<T>::DuplicateFile)?
-							}
-						}
-					}
-					let item = CollectionItem {
-						description: item_description.clone(),
-						files: item_files.clone(),
-						token: item_token.clone(),
-						restricted_delivery,
-					};
-					<CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
-					let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
-					<CollectionSizeMap<T>>::insert(&collection_loc_id, collection_size + 1);
-				},
-			}
-
-			Self::deposit_event(Event::ItemAdded(collection_loc_id, item_id));
-			Ok(().into())
-		}
+		/// Adds a licensed item to a collection
+		#[pallet::weight(T::WeightInfo::add_collection_item())]
+		pub fn add_licensed_collection_item(
+			origin: OriginFor<T>,
+			#[pallet::compact] collection_loc_id: T::LocId,
+			item_id: T::CollectionItemId,
+			item_description: Vec<u8>,
+			item_files: Vec<CollectionItemFileOf<T>>,
+			item_token: Option<CollectionItemToken>,
+			restricted_delivery: bool,
+			license: License<<T as pallet::Config>::Hash>,
+		) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, license) }
 	}
 
 	impl<T: Config> LocQuery<<T as frame_system::Config>::AccountId> for Pallet<T> {
@@ -901,6 +861,83 @@ pub mod pallet {
 					Ok(().into())
 				}
 			}
+		}
+
+		fn do_add_collection_item(
+			origin: OriginFor<T>,
+			collection_loc_id: T::LocId,
+			item_id: T::CollectionItemId,
+			item_description: Vec<u8>,
+			item_files: Vec<CollectionItemFileOf<T>>,
+			item_token: Option<CollectionItemToken>,
+			restricted_delivery: bool,
+			license: License<<T as pallet::Config>::Hash>,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+
+			if item_description.len() > T::MaxCollectionItemDescriptionSize::get() {
+				Err(Error::<T>::CollectionItemTooMuchData)?
+			}
+
+			if item_token.is_some() && item_token.as_ref().unwrap().token_type.len() > T::MaxCollectionItemTokenTypeSize::get() {
+				Err(Error::<T>::CollectionItemTooMuchData)?
+			}
+
+			if item_token.is_some() && item_token.as_ref().unwrap().token_id.len() > T::MaxCollectionItemTokenIdSize::get() {
+				Err(Error::<T>::CollectionItemTooMuchData)?
+			}
+
+			if restricted_delivery && item_token.is_none() {
+				Err(Error::<T>::MissingToken)?
+			}
+
+			if restricted_delivery && item_files.len() == 0 {
+				Err(Error::<T>::MissingFiles)?
+			}
+
+			let collection_loc_option = <LocMap<T>>::get(&collection_loc_id);
+			match collection_loc_option {
+				None => Err(Error::<T>::WrongCollectionLoc)?,
+				Some(collection_loc) => {
+					if <CollectionItemsMap<T>>::contains_key(&collection_loc_id, &item_id) {
+						Err(Error::<T>::CollectionItemAlreadyExists)?
+					}
+					if ! Self::can_add_item(&who, &collection_loc) {
+						Err(Error::<T>::WrongCollectionLoc)?
+					}
+					if Self::collection_limits_reached(&collection_loc_id, &collection_loc) {
+						Err(Error::<T>::CollectionLimitsReached)?
+					}
+					if !collection_loc.collection_can_upload && item_files.len() > 0 {
+						Err(Error::<T>::CannotUpload)?
+					}
+					if collection_loc.collection_can_upload {
+						if item_files.len() == 0 {
+							Err(Error::<T>::MustUpload)?
+						} else {
+							let files_hashes: Vec<<T as Config>::Hash> = item_files.iter()
+								.map(|file| file.hash)
+								.collect();
+							if !Self::has_unique_elements(&files_hashes) {
+								Err(Error::<T>::DuplicateFile)?
+							}
+						}
+					}
+					let item = CollectionItem {
+						description: item_description.clone(),
+						files: item_files.clone(),
+						token: item_token.clone(),
+						restricted_delivery,
+						license,
+					};
+					<CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
+					let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
+					<CollectionSizeMap<T>>::insert(&collection_loc_id, collection_size + 1);
+				},
+			}
+
+			Self::deposit_event(Event::ItemAdded(collection_loc_id, item_id));
+			Ok(().into())
 		}
 	}
 }
