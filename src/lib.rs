@@ -92,26 +92,23 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber> {
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<<T as frame_system::Config>::AccountId, <T as pallet::Config>::Hash, <T as pallet::Config>::LocId, <T as frame_system::Config>::BlockNumber>;
 
-pub type LicenseItem = Vec<u8>;
-
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub enum License<Hash> {
-	#[default]
-	None,
-	Specific(Hash),
-	Logion(Hash, Vec<LicenseItem>)
+pub struct License<LocId> {
+	license_type: Vec<u8>,
+	license_loc: LocId,
+	details: Vec<u8>,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct CollectionItem<Hash> {
+pub struct CollectionItem<Hash, LocId> {
 	description: Vec<u8>,
 	files: Vec<CollectionItemFile<Hash>>,
 	token: Option<CollectionItemToken>,
 	restricted_delivery: bool,
-	license: License<Hash>,
+	license: Option<License<LocId>>,
 }
 
-pub type CollectionItemOf<T> = CollectionItem<<T as pallet::Config>::Hash>;
+pub type CollectionItemOf<T> = CollectionItem<<T as pallet::Config>::Hash, <T as pallet::Config>::LocId>;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct CollectionItemFile<Hash> {
@@ -285,6 +282,12 @@ pub mod pallet {
 		MissingToken,
 		/// Collection items with restricted delivery require at least one associated file
 		MissingFiles,
+		/// License LOC does not exist
+		LicenseLocNotFound,
+		/// License LOC not closed
+		LicenseLocNotClosed,
+		/// License LOC is void
+		LicenseLocVoid,
 	}
 
 	#[pallet::hooks]
@@ -609,7 +612,7 @@ pub mod pallet {
 			item_files: Vec<CollectionItemFileOf<T>>,
 			item_token: Option<CollectionItemToken>,
 			restricted_delivery: bool,
-		) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, License::None) }
+		) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, None) }
 
 		/// Adds a licensed item to a collection
 		#[pallet::weight(T::WeightInfo::add_collection_item())]
@@ -621,8 +624,8 @@ pub mod pallet {
 			item_files: Vec<CollectionItemFileOf<T>>,
 			item_token: Option<CollectionItemToken>,
 			restricted_delivery: bool,
-			license: License<<T as pallet::Config>::Hash>,
-		) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, license) }
+			license: License<<T as pallet::Config>::LocId>,
+		) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, Some(license)) }
 	}
 
 	impl<T: Config> LocQuery<<T as frame_system::Config>::AccountId> for Pallet<T> {
@@ -871,7 +874,7 @@ pub mod pallet {
 			item_files: Vec<CollectionItemFileOf<T>>,
 			item_token: Option<CollectionItemToken>,
 			restricted_delivery: bool,
-			license: License<<T as pallet::Config>::Hash>,
+			license: Option<License<<T as pallet::Config>::LocId>>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
@@ -923,6 +926,23 @@ pub mod pallet {
 							}
 						}
 					}
+
+					match license {
+						Some(ref license) => {
+							if !<LocMap<T>>::contains_key(&license.license_loc) {
+								Err(Error::<T>::LicenseLocNotFound)?
+							} else {
+								let license_loc = <LocMap<T>>::get(license.license_loc).unwrap();
+								if license_loc.void_info.is_some() {
+									Err(Error::<T>::LicenseLocVoid)?
+								} else if !license_loc.closed {
+									Err(Error::<T>::LicenseLocNotClosed)?
+								}
+							}
+						}
+						_ => {}
+					}
+
 					let item = CollectionItem {
 						description: item_description.clone(),
 						files: item_files.clone(),

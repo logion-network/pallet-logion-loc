@@ -8,7 +8,7 @@ use crate::{Config, LegalOfficerCaseOf, pallet, PalletStorageVersion, pallet::St
 
 pub mod v9 {
 	use super::*;
-	use crate::{CollectionItemFile, CollectionItemsMap, CollectionItemOf, License, CollectionItemToken};
+	use crate::{CollectionItemFile, CollectionItemsMap, CollectionItemOf, CollectionItemToken};
 
 	#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
 	struct CollectionItemV8<Hash> {
@@ -35,7 +35,7 @@ pub mod v9 {
 							files: item.files.clone(),
 							token: item.token.clone(),
 							restricted_delivery: item.restricted_delivery.clone(),
-							license: License::None,
+							license: None,
 						};
 						Some(new_item)
 					});
