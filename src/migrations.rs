@@ -6,6 +6,45 @@ use frame_support::traits::OnRuntimeUpgrade;
 
 use crate::{Config, LegalOfficerCaseOf, pallet, PalletStorageVersion, pallet::StorageVersion};
 
+pub mod v9 {
+	use super::*;
+	use crate::{CollectionItemFile, CollectionItemsMap, CollectionItemOf, CollectionItemToken};
+
+	#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
+	struct CollectionItemV8<Hash> {
+		description: Vec<u8>,
+		files: Vec<CollectionItemFile<Hash>>,
+		token: Option<CollectionItemToken>,
+		restricted_delivery: bool,
+	}
+
+	type CollectionItemV8Of<T> = CollectionItemV8<<T as pallet::Config>::Hash>;
+
+	pub struct AddLicenseToCollectionItem<T>(sp_std::marker::PhantomData<T>);
+	impl<T: Config> OnRuntimeUpgrade for AddLicenseToCollectionItem<T> {
+
+		fn on_runtime_upgrade() -> Weight {
+			super::do_storage_upgrade::<T, _>(
+				StorageVersion::V8AddSeal,
+				StorageVersion::V9License,
+				"AddLicenseToCollectionItem",
+				|| {
+					CollectionItemsMap::<T>::translate(|_loc_id: T::LocId, _item_id: T::CollectionItemId, item: CollectionItemV8Of<T>| {
+						let new_item = CollectionItemOf::<T> {
+							description: item.description.clone(),
+							files: item.files.clone(),
+							token: item.token.clone(),
+							restricted_delivery: item.restricted_delivery.clone(),
+							license: None,
+						};
+						Some(new_item)
+					});
+				}
+			)
+		}
+	}
+}
+
 pub mod v8 {
 	use super::*;
 	use crate::*;
@@ -54,42 +93,6 @@ pub mod v8 {
 							seal: Option::None,
 						})
 					})
-				}
-			)
-		}
-	}
-}
-
-pub mod v7 {
-	use super::*;
-	use crate::{CollectionItemFile, CollectionItemsMap, CollectionItemOf};
-
-	#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
-	struct CollectionItemV6<Hash> {
-		description: Vec<u8>,
-		files: Vec<CollectionItemFile<Hash>>,
-	}
-
-	type CollectionItemV6Of<T> = CollectionItemV6<<T as pallet::Config>::Hash>;
-
-	pub struct AddTokenToCollectionItem<T>(sp_std::marker::PhantomData<T>);
-	impl<T: Config> OnRuntimeUpgrade for AddTokenToCollectionItem<T> {
-
-		fn on_runtime_upgrade() -> Weight {
-			super::do_storage_upgrade::<T, _>(
-				StorageVersion::V6ItemUpload, 
-				StorageVersion::V7ItemToken, 
-				"AddTokenToCollectionItem",
-				|| {
-					CollectionItemsMap::<T>::translate(|_loc_id: T::LocId, _item_id: T::CollectionItemId, item: CollectionItemV6Of<T>| {
-						let new_item = CollectionItemOf::<T> {
-							description: item.description.clone(),
-							files: item.files.clone(),
-							token: Option::None,
-							restricted_delivery: false,
-						};
-						Some(new_item)
-					});
 				}
 			)
 		}
