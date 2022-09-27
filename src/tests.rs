@@ -5,12 +5,13 @@ use sp_runtime::traits::Hash;
 
 use logion_shared::LocQuery;
 
-use crate::{File, LegalOfficerCase, LocLink, LocType, MetadataItem, CollectionItem, CollectionItemFile, CollectionItemToken, mock::*, License};
+use crate::{File, LegalOfficerCase, LocLink, LocType, MetadataItem, CollectionItem, CollectionItemFile, CollectionItemToken, mock::*, TermsAndConditionsElement};
 use crate::Error;
 
 const LOC_ID: u32 = 0;
 const OTHER_LOC_ID: u32 = 1;
-const LICENSE_LOC_ID: u32 = 2;
+const LOGION_CLASSIFICATION_LOC_ID: u32 = 2;
+const ADDITIONAL_TC_LOC_ID: u32 = 3;
 
 #[test]
 fn it_creates_loc() {
@@ -540,92 +541,99 @@ fn it_adds_item_to_closed_collection_loc() {
 			files: vec![],
 			token: Option::None,
 			restricted_delivery: false,
-			license: None,
+			terms_and_conditions: vec![],
 		}));
 		assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
 	});
 }
 
 #[test]
-fn it_fails_to_add_licensed_item_with_non_existent_license_loc() {
+fn it_fails_to_item_with_terms_and_conditions_when_non_existent_tc_loc() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(LogionLoc::create_collection_loc(Origin::signed(LOC_OWNER1), LOC_ID, LOC_REQUESTER_ID, Option::None, Option::Some(10), false));
 		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOC_ID));
 
 		let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
 		let collection_item_description = "item-description".as_bytes().to_vec();
-		let license_details = "ITEM-A, ITEM-B".as_bytes().to_vec();
-		let license = License {
-			license_type: "Logion".as_bytes().to_vec(),
-			license_loc: LICENSE_LOC_ID,
-			details: license_details.clone()
-		};
-		assert_err!(LogionLoc::add_licensed_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, license.clone()), Error::<Test>::LicenseLocNotFound);
+		let terms_and_conditions_details = "ITEM-A, ITEM-B".as_bytes().to_vec();
+		let terms_and_conditions = vec![TermsAndConditionsElement {
+			tc_type: "Logion".as_bytes().to_vec(),
+			tc_loc: LOGION_CLASSIFICATION_LOC_ID,
+			details: terms_and_conditions_details.clone()
+		}];
+		assert_err!(LogionLoc::add_collection_item_with_terms_and_conditions(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocNotFound);
 	});
 }
 
 #[test]
-fn it_fails_to_add_licensed_item_with_open_license_loc() {
+fn it_fails_to_item_with_terms_and_conditions_when_open_tc_loc() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(LogionLoc::create_collection_loc(Origin::signed(LOC_OWNER1), LOC_ID, LOC_REQUESTER_ID, Option::None, Option::Some(10), false));
 		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOC_ID));
-		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), LICENSE_LOC_ID, LOC_REQUESTER_ID));
+		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), LOGION_CLASSIFICATION_LOC_ID, LOC_REQUESTER_ID));
 
 		let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
 		let collection_item_description = "item-description".as_bytes().to_vec();
-		let license_details = "ITEM-A, ITEM-B".as_bytes().to_vec();
-		let license = License {
-			license_type: "Logion".as_bytes().to_vec(),
-			license_loc: LICENSE_LOC_ID,
-			details: license_details.clone()
-		};
-		assert_err!(LogionLoc::add_licensed_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, license.clone()), Error::<Test>::LicenseLocNotClosed);
+		let terms_and_conditions_details = "ITEM-A, ITEM-B".as_bytes().to_vec();
+		let terms_and_conditions = vec![TermsAndConditionsElement {
+			tc_type: "Logion".as_bytes().to_vec(),
+			tc_loc: LOGION_CLASSIFICATION_LOC_ID,
+			details: terms_and_conditions_details.clone()
+		}];
+		assert_err!(LogionLoc::add_collection_item_with_terms_and_conditions(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocNotClosed);
 	});
 }
 
 #[test]
-fn it_fails_to_add_licensed_item_with_void_license_loc() {
+fn it_fails_to_item_with_terms_and_conditions_when_void_tc_loc() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(LogionLoc::create_collection_loc(Origin::signed(LOC_OWNER1), LOC_ID, LOC_REQUESTER_ID, Option::None, Option::Some(10), false));
 		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOC_ID));
-		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), LICENSE_LOC_ID, LOC_REQUESTER_ID));
-		assert_ok!(LogionLoc::make_void(Origin::signed(LOC_OWNER1), LICENSE_LOC_ID));
+		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), LOGION_CLASSIFICATION_LOC_ID, LOC_REQUESTER_ID));
+		assert_ok!(LogionLoc::make_void(Origin::signed(LOC_OWNER1), LOGION_CLASSIFICATION_LOC_ID));
 
 		let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
 		let collection_item_description = "item-description".as_bytes().to_vec();
-		let license_details = "ITEM-A, ITEM-B".as_bytes().to_vec();
-		let license = License {
-			license_type: "Logion".as_bytes().to_vec(),
-			license_loc: LICENSE_LOC_ID,
-			details: license_details.clone()
-		};
-		assert_err!(LogionLoc::add_licensed_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, license.clone()), Error::<Test>::LicenseLocVoid);
+		let terms_and_conditions_details = "ITEM-A, ITEM-B".as_bytes().to_vec();
+		let terms_and_conditions = vec![TermsAndConditionsElement {
+			tc_type: "Logion".as_bytes().to_vec(),
+			tc_loc: LOGION_CLASSIFICATION_LOC_ID,
+			details: terms_and_conditions_details.clone()
+		}];
+		assert_err!(LogionLoc::add_collection_item_with_terms_and_conditions(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocVoid);
 	});
 }
 
 #[test]
-fn it_adds_item_with_license_to_closed_collection_loc() {
+fn it_adds_item_with_terms_and_conditions_to_closed_collection_loc() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(LogionLoc::create_collection_loc(Origin::signed(LOC_OWNER1), LOC_ID, LOC_REQUESTER_ID, Option::None, Option::Some(10), false));
 		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOC_ID));
-		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), LICENSE_LOC_ID, LOC_REQUESTER_ID));
-		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LICENSE_LOC_ID));
+		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), LOGION_CLASSIFICATION_LOC_ID, LOC_REQUESTER_ID));
+		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), LOGION_CLASSIFICATION_LOC_ID));
+		assert_ok!(LogionLoc::create_polkadot_transaction_loc(Origin::signed(LOC_OWNER1), ADDITIONAL_TC_LOC_ID, LOC_REQUESTER_ID));
+		assert_ok!(LogionLoc::close(Origin::signed(LOC_OWNER1), ADDITIONAL_TC_LOC_ID));
 
 		let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
 		let collection_item_description = "item-description".as_bytes().to_vec();
-		let license_details = "ITEM-A, ITEM-B".as_bytes().to_vec();
-		let license = License {
-			license_type: "Logion".as_bytes().to_vec(),
-			license_loc: LICENSE_LOC_ID,
-			details: license_details.clone()
+		let tc1 = TermsAndConditionsElement {
+			tc_type: "Logion".as_bytes().to_vec(),
+			tc_loc: LOGION_CLASSIFICATION_LOC_ID,
+			details: "ITEM-A, ITEM-B".as_bytes().to_vec().clone()
 		};
-		assert_ok!(LogionLoc::add_licensed_collection_item(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, license.clone()));
+		let tc2 = TermsAndConditionsElement {
+			tc_type: "Specific".as_bytes().to_vec(),
+			tc_loc: ADDITIONAL_TC_LOC_ID,
+			details: "Some more details".as_bytes().to_vec().clone()
+		};
+		let terms_and_conditions = vec![tc1, tc2];
+		assert_ok!(LogionLoc::add_collection_item_with_terms_and_conditions(Origin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], Option::None, false, terms_and_conditions.clone()));
 		assert_eq!(LogionLoc::collection_items(LOC_ID, collection_item_id), Some(CollectionItem {
 			description: collection_item_description,
 			files: vec![],
 			token: None,
 			restricted_delivery: false,
-			license: Some(license.clone()),
+			terms_and_conditions: terms_and_conditions.clone(),
 		}));
 		assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
 	});
