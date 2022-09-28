@@ -20,14 +20,14 @@ pub mod v9 {
 
 	type CollectionItemV8Of<T> = CollectionItemV8<<T as pallet::Config>::Hash>;
 
-	pub struct AddLicenseToCollectionItem<T>(sp_std::marker::PhantomData<T>);
-	impl<T: Config> OnRuntimeUpgrade for AddLicenseToCollectionItem<T> {
+	pub struct AddTermsAndConditionsToCollectionItem<T>(sp_std::marker::PhantomData<T>);
+	impl<T: Config> OnRuntimeUpgrade for AddTermsAndConditionsToCollectionItem<T> {
 
 		fn on_runtime_upgrade() -> Weight {
 			super::do_storage_upgrade::<T, _>(
 				StorageVersion::V8AddSeal,
-				StorageVersion::V9License,
-				"AddLicenseToCollectionItem",
+				StorageVersion::V9TermsAndConditions,
+				"AddTermsAndConditionsToCollectionItem",
 				|| {
 					CollectionItemsMap::<T>::translate(|_loc_id: T::LocId, _item_id: T::CollectionItemId, item: CollectionItemV8Of<T>| {
 						let new_item = CollectionItemOf::<T> {
@@ -35,7 +35,7 @@ pub mod v9 {
 							files: item.files.clone(),
 							token: item.token.clone(),
 							restricted_delivery: item.restricted_delivery.clone(),
-							license: None,
+							terms_and_conditions: Vec::new(),
 						};
 						Some(new_item)
 					});
