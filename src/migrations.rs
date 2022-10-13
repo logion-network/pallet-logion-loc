@@ -114,6 +114,6 @@ where F: FnOnce() -> () {
 		} else {
 			log::info!("❎ {:?} execution skipped, already at target version {:?}", migration_name, target_version);
 		}
-		0
+		T::DbWeight::get().reads(1)
 	}
 }
