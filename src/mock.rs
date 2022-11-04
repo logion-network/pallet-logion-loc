@@ -31,8 +31,8 @@ impl system::Config for Test {
 	type BlockWeights = ();
 	type BlockLength = ();
 	type DbWeight = ();
-	type Origin = Origin;
-	type Call = Call;
+	type RuntimeOrigin = RuntimeOrigin;
+	type RuntimeCall = RuntimeCall;
 	type Index = u64;
 	type BlockNumber = u64;
 	type Hash = H256;
@@ -40,7 +40,7 @@ impl system::Config for Test {
 	type AccountId = u64;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type BlockHashCount = BlockHashCount;
 	type Version = ();
 	type PalletInfo = PalletInfo;
@@ -60,10 +60,10 @@ pub const LOC_REQUESTER: RequesterOf<Test> = RequesterOf::<Test>::Account(LOC_RE
 pub const LOGION_IDENTITY_LOC_ID: u32 = 4;
 
 pub struct LoAuthorityListMock;
-impl EnsureOrigin<Origin> for LoAuthorityListMock {
+impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
     type Success = ();
 
-    fn try_origin(o: Origin) -> std::result::Result<Self::Success, Origin> {
+    fn try_origin(o: RuntimeOrigin) -> std::result::Result<Self::Success, RuntimeOrigin> {
 		let result = ensure_signed(o.clone());
         match result {
 			Ok(who) => {
@@ -90,7 +90,7 @@ parameter_types! {
 
 impl pallet_loc::Config for Test {
 	type LocId = u32;
-	type Event = Event;
+	type RuntimeEvent = RuntimeEvent;
 	type Hash = H256;
 	type CreateOrigin = LoAuthorityListMock;
 	type MaxMetadataItemNameSize = MaxMetadataItemNameSize;

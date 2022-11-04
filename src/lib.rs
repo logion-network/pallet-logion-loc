@@ -150,13 +150,13 @@ pub mod pallet {
 		type Hash: Member + Parameter + Default + Copy + Ord;
 
 		/// The origin (must be signed) which can create a LOC.
-		type CreateOrigin: EnsureOrigin<Self::Origin>;
+		type CreateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
 
 		/// The overarching event type.
-		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		/// Collection item identifier
 		type CollectionItemId: Member + Parameter + Default + Copy;
